@@ -51,7 +51,8 @@ def approve_node(suggestion_state: SuggestorState) -> SuggestorState:
     human_review = interrupt(
         {
             "message": "Please review,edit and approve the suggestion",
-            "feedback": suggestion_state["suggestion"],
+            "suggestion": suggestion_state["suggestion"],
+            "feedback": suggestion_state["feedback"],
         }
     )
     action = human_review["action"]
@@ -59,9 +60,31 @@ def approve_node(suggestion_state: SuggestorState) -> SuggestorState:
         suggestion_state["approved"] = True
     elif action == "Reject":
         suggestion_state["approved"] = False
+        suggestion_state["feedback"]=""
     elif action == "Edit":
         suggestion_state["feedback"] = human_review["feedback"]
-        suggestion_state["approved"] = True
+        suggestion_state["approved"] = False
     else:
         raise ValueError(f"Invalid action: {action}")
     return suggestion_state
+
+def refine_node(suggestion_state: SuggestorState) -> SuggestorState:
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            SystemMessagePromptTemplate.from_template(
+                 "You are an expert summarizer. Improve the previous summary using the reviewer feedback."
+            ),
+            HumanMessagePromptTemplate.from_template(
+                "Topic: {topic}\n\nPrevious suggestion:\n{suggestion}\n\nReviewer feedback:\n{feedback}\n\nReturn only the improved summary."
+            ),
+        ]
+    )
+    message = prompt.format_messages(
+        topic=suggestion_state["query"],
+        suggestion=suggestion_state["suggestion"],
+        feedback=suggestion_state["feedback"]
+    )
+    response = llm.invoke(message)
+    suggestion_state["suggestion"] = response.content
+    suggestion_state["revision_count"] += 1
+    return suggestion_state    
