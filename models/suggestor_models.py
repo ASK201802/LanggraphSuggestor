@@ -6,3 +6,5 @@ class SuggestorState(TypedDict):
     suggestion: str
     feedback: str
     approved: bool
+    revision_count: int
+        
